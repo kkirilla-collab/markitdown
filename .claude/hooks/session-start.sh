@@ -17,4 +17,11 @@ pip install --quiet -e "packages/markitdown[all]"
 # the base image ships a Debian cryptography without it, so install it explicitly.
 pip install --quiet pytest black cffi
 
+# ffmpeg is the system binary that pydub needs for the audio-transcription tests;
+# install it if it isn't already present (best-effort, don't fail the hook on it).
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  apt-get update -qq && apt-get install -y -qq ffmpeg || \
+    echo "warning: ffmpeg install failed; audio-transcription tests may be skipped/fail"
+fi
+
 echo "markitdown dev environment ready."
