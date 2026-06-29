@@ -92,6 +92,7 @@ class ImageConverter(DocumentConverter):
         client,
         model,
         prompt=None,
+        max_tokens=None,
     ) -> Union[None, str]:
         if prompt is None or prompt.strip() == "":
             prompt = "Write a detailed caption for this image."
@@ -134,5 +135,8 @@ class ImageConverter(DocumentConverter):
         ]
 
         # Call the OpenAI API
-        response = client.chat.completions.create(model=model, messages=messages)
+        create_kwargs = {"model": model, "messages": messages}
+        if max_tokens is not None:
+            create_kwargs["max_tokens"] = max_tokens
+        response = client.chat.completions.create(**create_kwargs)
         return response.choices[0].message.content

@@ -37,6 +37,7 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
     llm_client = kwargs.get("llm_client")
     llm_model = kwargs.get("llm_model")
     llm_prompt = kwargs.get("llm_prompt")
+    llm_max_tokens = kwargs.get("llm_max_tokens")
 
     ocr_service: LLMVisionOCRService | None = None
     if llm_client and llm_model:
@@ -44,6 +45,7 @@ def register_converters(markitdown: MarkItDown, **kwargs: Any) -> None:
             client=llm_client,
             model=llm_model,
             default_prompt=llm_prompt,
+            max_tokens=llm_max_tokens,
         )
 
     # Register converters with priority -1.0 (before built-ins at 0.0)

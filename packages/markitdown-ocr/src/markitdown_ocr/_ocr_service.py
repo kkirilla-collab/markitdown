@@ -28,6 +28,7 @@ class LLMVisionOCRService:
         client: Any,
         model: str,
         default_prompt: str | None = None,
+        max_tokens: int | None = None,
     ) -> None:
         """
         Initialize LLM Vision OCR service.
@@ -36,9 +37,11 @@ class LLMVisionOCRService:
             client: OpenAI-compatible client
             model: Model name (e.g., 'gpt-4o', 'gemini-2.0-flash')
             default_prompt: Default prompt for OCR extraction
+            max_tokens: Maximum tokens in model response
         """
         self.client = client
         self.model = model
+        self.max_tokens = max_tokens
         self.default_prompt = default_prompt or (
             "Extract all text from this image. "
             "Return ONLY the extracted text, maintaining the original "
@@ -83,9 +86,9 @@ class LLMVisionOCRService:
             data_uri = f"data:{content_type};base64,{base64_image}"
 
             actual_prompt = prompt or self.default_prompt
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
+            create_kwargs = {
+                "model": self.model,
+                "messages": [
                     {
                         "role": "user",
                         "content": [
@@ -97,7 +100,10 @@ class LLMVisionOCRService:
                         ],
                     }
                 ],
-            )
+            }
+            if self.max_tokens is not None:
+                create_kwargs["max_tokens"] = self.max_tokens
+            response = self.client.chat.completions.create(**create_kwargs)
 
             text = response.choices[0].message.content
             return OCRResult(

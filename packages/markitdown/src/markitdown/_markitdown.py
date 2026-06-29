@@ -124,6 +124,7 @@ class MarkItDown:
         self._llm_client: Any = None
         self._llm_model: Union[str | None] = None
         self._llm_prompt: Union[str | None] = None
+        self._llm_max_tokens: Union[int | None] = None
         self._exiftool_path: Union[str | None] = None
         self._style_map: Union[str | None] = None
 
@@ -149,6 +150,7 @@ class MarkItDown:
             self._llm_client = kwargs.get("llm_client")
             self._llm_model = kwargs.get("llm_model")
             self._llm_prompt = kwargs.get("llm_prompt")
+            self._llm_max_tokens = kwargs.get("llm_max_tokens")
             self._exiftool_path = kwargs.get("exiftool_path")
             self._style_map = kwargs.get("style_map")
 
@@ -593,6 +595,9 @@ class MarkItDown:
 
                 if "llm_prompt" not in _kwargs and self._llm_prompt is not None:
                     _kwargs["llm_prompt"] = self._llm_prompt
+
+                if "llm_max_tokens" not in _kwargs and self._llm_max_tokens is not None:
+                    _kwargs["llm_max_tokens"] = self._llm_max_tokens
 
                 if "style_map" not in _kwargs and self._style_map is not None:
                     _kwargs["style_map"] = self._style_map
