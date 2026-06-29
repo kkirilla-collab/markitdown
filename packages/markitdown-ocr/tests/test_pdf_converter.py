@@ -149,12 +149,27 @@ def test_pdf_complex_layout(svc: MockOCRService) -> None:
 
 
 def test_pdf_multipage(svc: MockOCRService) -> None:
-    # pdfplumber cannot open this file (Unexpected EOF), so _ocr_full_pages
-    # falls back to PyMuPDF for page rendering.  Each page becomes one OCR block.
+    # pdfplumber successfully reads this file: text content is extracted
+    # alongside embedded image OCR blocks.
     expected = (
-        f"## Page 1\n\n\n{_OCR_BLOCK}\n\n\n"
-        f"## Page 2\n\n\n{_OCR_BLOCK}\n\n\n"
-        f"## Page 3\n\n\n{_OCR_BLOCK}"
+        "## Page 1\n\n\n"
+        "Page 1 - Content before image\n\n"
+        "This is important text that appears BEFORE the image.\n\n\n\n"
+        f"{_OCR_BLOCK}\n\n\n"
+        "This text appears AFTER the image on page 1.\n\n"
+        "More content follows here.\n\n\n"
+        "## Page 2\n\n\n"
+        "Page 2 - Content with image at end\n\n"
+        "Main content of page 2 starts here.\n\n"
+        "This is paragraph 1.\n\n"
+        "This is paragraph 2.\n\n"
+        "Final paragraph before image.\n\n\n\n"
+        f"{_OCR_BLOCK}\n\n\n\n"
+        "## Page 3\n\n\n"
+        "Page 3 - Image at top\n\n\n\n"
+        f"{_OCR_BLOCK}\n\n\n"
+        "Content that follows the image.\n\n"
+        "This text is AFTER the image."
     )
     assert _convert("pdf_multipage.pdf", svc) == expected
 
