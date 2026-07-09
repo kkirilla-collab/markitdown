@@ -31,7 +31,30 @@ permanent default, not a one-off preference. Status/verdict text (`status()`)
 is distinguished by being **bold**, never by colour or cell fill — the wording
 itself ("В графике" / "Отставание" / "Риск") carries the meaning. Don't
 reintroduce fills or hue-based colour when extending this skill; if a report
-seems to need visual differentiation, use bold/italic/wording, not colour.
+seems to need visual differentiation, use bold wording, not colour.
+
+Font is **Proxima Nova Extra Condensed, 14pt base** (`FONT_NAME`/`BASE_SIZE` in
+`render.py`), also by explicit request — section headings and titles are
+bumped to 16/18/20pt for a visual hierarchy, but otherwise nothing is bigger
+or smaller than the base without a reason. If the user asks for a different
+font or size, change the two constants at the top of `render.py`, not a
+one-off `size=` at a call site — keep it a single source of truth.
+
+**No italics, no underlines, no em-dashes, minimal colons/semicolons** — also
+explicit user corrections, and now permanent. Concretely, when writing the
+text that goes *into* a spec (not the renderer's own code):
+- Never reach for `italic=True` or an underline. `gap()`/`blank()` already
+  render in plain grey, without italics, precisely so this doesn't come up.
+- Never type an em dash (—). Restructure the sentence instead: split into two
+  short sentences with a period, use a comma, or use a connector word ("из-за",
+  "в том числе", "а не"). A bare "no data" table cell placeholder is a plain
+  hyphen (`-`), not an em dash. Numeric ranges (e.g. "п. 4-6") also use a
+  plain hyphen here, not a typographic en/em dash.
+- Don't chain clauses with semicolons — split into separate sentences instead.
+- Keep colons rare. A label-value pair in a `meta_line` ("Дата отчёта ...")
+  reads fine with just a space, no colon needed. Where you're tempted to
+  write "X: Y", try "X Y" (direct juxtaposition), "X, Y", or two sentences
+  first — reach for a colon only if none of those reads naturally.
 
 ## When to use
 
@@ -91,12 +114,14 @@ seems to need visual differentiation, use bold/italic/wording, not colour.
   status/verdict value. `level` ∈ `"ok" | "warn" | "bad" | "note"` is accepted
   for the caller's own bookkeeping/consistency but doesn't affect rendering —
   every status renders the same (bold); put the distinction in the wording.
-- `gap(text="не указано в справке")` — grey italic cell marking a genuine gap
-  in the source data.
-- `blank(text="—")` — grey italic cell for a future-date placeholder row
-  (e.g. tomorrow's row in a dynamics log) — same look as `gap()`, kept as a
-  separate function only so calling code can express *why* the cell is empty
-  ("source never had this" vs. "this is tomorrow, not written yet").
+- `gap(text="не указано в справке")` — plain grey cell (no italics) marking a
+  genuine gap in the source data.
+- `blank(text="заполнить")` — plain grey cell for a future-date placeholder
+  row (e.g. tomorrow's row in a dynamics log) — same look as `gap()`, kept as
+  a separate function only so calling code can express *why* the cell is
+  empty ("source never had this" vs. "this is tomorrow, not written yet").
+  Usually called as `blank("08.07.2026")` — the date itself is the label, the
+  grey styling already signals "not filled in yet".
 
 ## Schema
 
@@ -107,7 +132,7 @@ seems to need visual differentiation, use bold/italic/wording, not colour.
   "title": str,                      # top H0 heading
   "subtitle_lines": [str, ...],      # bold lines under the title (object/parties/contract)
   "meta_line": str,                  # "Дата отчёта: ...    Составил: ___"
-  "top_notes": [str, ...],           # grey-italic callouts right under the header (e.g. source data conflicts)
+  "top_notes": [str, ...],           # grey callouts right under the header (e.g. source data conflicts)
   "sections": [
     {
       "heading": str,                # e.g. "1. Наименование контрагента, виды работ"
@@ -117,7 +142,7 @@ seems to need visual differentiation, use bold/italic/wording, not colour.
         "rows": [[cell, ...], ...],  # cell = str | status(...) | gap(...) | blank(...)
         "widths_cm": [float, ...],   # optional, else auto
       },
-      "notes": [str, ...],           # optional grey-italic callouts after the table
+      "notes": [str, ...],           # optional grey callouts after the table
     },
     ...                              # one dict per report section — add as many as needed
   ],
@@ -126,7 +151,7 @@ seems to need visual differentiation, use bold/italic/wording, not colour.
     "intro": str,
     "items": [{"lead": str, "text": str}, ...],  # lead is bolded, text is the explanation
   },
-  "footer_note": str,                # optional italic note on its own page at the end
+  "footer_note": str,                # optional grey note on its own page at the end
 }
 ```
 

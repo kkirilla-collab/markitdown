@@ -66,13 +66,13 @@ def status(text, level=None):
 
 
 def gap(text="не указано в справке"):
-    """A table cell flagging a genuine gap in the source data (grey italic)."""
-    return (text, {"italic": True, "color": MUTED})
+    """A table cell flagging a genuine gap in the source data (plain grey, no italics)."""
+    return (text, {"color": MUTED})
 
 
-def blank(text="—"):
-    """A table cell that's an empty placeholder to be filled in later (grey italic)."""
-    return (text, {"italic": True, "color": MUTED})
+def blank(text="заполнить"):
+    """A table cell that's an empty placeholder to be filled in later (plain grey, no italics)."""
+    return (text, {"color": MUTED})
 
 
 # --------------------------------------------------------------------------
@@ -186,7 +186,7 @@ def _para(doc, text, bold=False, italic=False, size=BASE_SIZE, color=None, space
 
 
 def _note(doc, text):
-    _para(doc, text, italic=True, color=MUTED)
+    _para(doc, text, color=MUTED)
 
 
 def _bullet(doc, lead, text):
@@ -268,7 +268,7 @@ def generate_detailed_report(spec, out_path):
 
     if spec.get("footer_note"):
         doc.add_page_break()
-        _para(doc, spec["footer_note"], italic=True, color=MUTED)
+        _para(doc, spec["footer_note"], color=MUTED)
 
     doc.save(out_path)
     return out_path
@@ -298,7 +298,7 @@ def generate_short_report(spec, out_path):
         _render_table_block(doc, block)
 
     if spec.get("footer_note"):
-        _para(doc, spec["footer_note"], italic=True, color=MUTED)
+        _para(doc, spec["footer_note"], color=MUTED)
 
     doc.save(out_path)
     return out_path
