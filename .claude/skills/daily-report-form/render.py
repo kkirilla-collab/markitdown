@@ -11,11 +11,18 @@ and a worked example) into two formatted .docx files:
     heading+table blocks (meant for a KPI strip, a per-party status table,
     a day-over-day dynamics log, an open-correspondence tracker, etc).
 
+Style is deliberately monochrome/"classic corporate" — black text on white,
+black-fill/white-text table headers, no colour-coded (RAG) status highlighting.
+Status is conveyed by the wording itself, rendered bold, never by hue — this
+is a deliberate choice (not a limitation): plain black-and-white also holds up
+when a report is printed or photocopied on a monochrome printer, unlike
+colour-coding, which silently degrades to indistinguishable grey.
+
 Callers build the `spec` dicts (usually Claude, after reading a new source
 memo and extracting facts into this shape) and pass them to
 `generate_detailed_report` / `generate_short_report`. Cells in a table row can
 be a plain string, or a (text, opts) tuple produced by `status()`, `gap()` or
-`blank()` below for colour-coded / greyed-out formatting.
+`blank()` below.
 """
 
 from docx import Document
@@ -25,11 +32,10 @@ from docx.enum.section import WD_ORIENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
-HEADER_FILL = "1F4E78"
-HEADER_FONT = "FFFFFF"
-
-STATUS_FILL = {"ok": "C6E0B4", "warn": "FFE699", "bad": "F8CBAD", "note": "D9D9D9"}
-STATUS_FONT = {"ok": "1E6B22", "warn": "8A6400", "bad": "C00000", "note": "595959"}
+INK = "000000"       # all text — pure black, no theme colours
+HEADER_FILL = "000000"  # table header row background
+HEADER_FONT = "FFFFFF"  # table header row text (white-on-black)
+MUTED = "595959"     # the one neutral grey used for de-emphasised/placeholder text
 
 
 def fmt(n):
@@ -38,19 +44,25 @@ def fmt(n):
     return s.replace(",", " ").replace(".", ",")
 
 
-def status(text, level):
-    """A table cell coloured by RAG status. level: 'ok' | 'warn' | 'bad' | 'note'."""
-    return (text, {"bold": True, "color": STATUS_FONT[level], "fill": STATUS_FILL[level]})
+def status(text, level=None):
+    """A table cell for a status/verdict value: bold black, no colour or fill.
+
+    `level` (e.g. 'ok' | 'warn' | 'bad' | 'note') is accepted for the caller's
+    own semantic bookkeeping (and so existing spec-building code doesn't need
+    to change), but it no longer affects rendering — every status renders
+    identically (bold black); the word itself carries the meaning.
+    """
+    return (text, {"bold": True})
 
 
 def gap(text="не указано в справке"):
     """A table cell flagging a genuine gap in the source data (grey italic)."""
-    return (text, {"italic": True, "color": "808080"})
+    return (text, {"italic": True, "color": MUTED})
 
 
 def blank(text="—"):
-    """A table cell that's an empty placeholder to be filled in later (lighter grey)."""
-    return (text, {"italic": True, "color": "A6A6A6"})
+    """A table cell that's an empty placeholder to be filled in later (grey italic)."""
+    return (text, {"italic": True, "color": MUTED})
 
 
 # --------------------------------------------------------------------------
@@ -75,8 +87,7 @@ def _set_cell(cell, text, bold=False, italic=False, color=None, size=9.5, align=
     run.bold = bold
     run.italic = italic
     run.font.size = Pt(size)
-    if color:
-        run.font.color.rgb = RGBColor.from_string(color)
+    run.font.color.rgb = RGBColor.from_string(color or INK)
     return run
 
 
@@ -106,8 +117,6 @@ def _add_table(doc, headers, rows, widths_cm=None):
                 _set_cell(cells[i], text, bold=opts.get("bold", False),
                           italic=opts.get("italic", False), color=opts.get("color"),
                           size=opts.get("size", 9.5))
-                if "fill" in opts:
-                    _shade_cell(cells[i], opts["fill"])
             else:
                 _set_cell(cells[i], str(val), size=9.5)
     if widths_cm:
@@ -119,10 +128,23 @@ def _add_table(doc, headers, rows, widths_cm=None):
     return table
 
 
+def _add_bottom_border(paragraph, size=6, color=INK):
+    pPr = paragraph._p.get_or_add_pPr()
+    pBdr = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), str(size))
+    bottom.set(qn("w:space"), "4")
+    bottom.set(qn("w:color"), color)
+    pBdr.append(bottom)
+    pPr.append(pBdr)
+
+
 def _h1(doc, text):
     p = doc.add_heading(text, level=1)
     for run in p.runs:
-        run.font.color.rgb = RGBColor.from_string(HEADER_FILL)
+        run.font.color.rgb = RGBColor.from_string(INK)
+    _add_bottom_border(p)
 
 
 def _para(doc, text, bold=False, italic=False, size=10.5, color=None, space_after=6):
@@ -132,12 +154,11 @@ def _para(doc, text, bold=False, italic=False, size=10.5, color=None, space_afte
     run.bold = bold
     run.italic = italic
     run.font.size = Pt(size)
-    if color:
-        run.font.color.rgb = RGBColor.from_string(color)
+    run.font.color.rgb = RGBColor.from_string(color or INK)
 
 
 def _note(doc, text):
-    _para(doc, "⚠ " + text, italic=True, size=9.5, color="808080")
+    _para(doc, text, italic=True, size=9.5, color=MUTED)
 
 
 def _bullet(doc, lead, text):
@@ -147,14 +168,17 @@ def _bullet(doc, lead, text):
         r = p.add_run(lead)
         r.bold = True
         r.font.size = Pt(10.5)
+        r.font.color.rgb = RGBColor.from_string(INK)
     r2 = p.add_run(text)
     r2.font.size = Pt(10.5)
+    r2.font.color.rgb = RGBColor.from_string(INK)
 
 
 def _set_base_style(doc):
     style = doc.styles["Normal"]
     style.font.name = "Times New Roman"
     style.font.size = Pt(11)
+    style.font.color.rgb = RGBColor.from_string(INK)
     rpr = style.element.get_or_add_rPr()
     rFonts = rpr.find(qn("w:rFonts"))
     if rFonts is None:
@@ -178,7 +202,7 @@ def _render_table_block(doc, block):
 # --------------------------------------------------------------------------
 
 def generate_detailed_report(spec, out_path):
-    """spec keys: title, subtitle_lines[], meta_line, top_notes[], legend(bool),
+    """spec keys: title, subtitle_lines[], meta_line, top_notes[],
     sections[{heading, intro[], table{headers,rows,widths_cm}, notes[]}],
     suggestions{heading, intro, items[{lead,text}]}, footer_note.
     See SKILL.md for the full schema and a worked example."""
@@ -188,7 +212,7 @@ def generate_detailed_report(spec, out_path):
 
     title = doc.add_heading(spec["title"], level=0)
     for run in title.runs:
-        run.font.color.rgb = RGBColor.from_string(HEADER_FILL)
+        run.font.color.rgb = RGBColor.from_string(INK)
         run.font.size = Pt(18)
 
     for line in spec.get("subtitle_lines", []):
@@ -197,21 +221,6 @@ def generate_detailed_report(spec, out_path):
         _note(doc, line)
     if spec.get("meta_line"):
         _para(doc, spec["meta_line"], size=10)
-
-    if spec.get("legend"):
-        p = doc.add_paragraph()
-        p.paragraph_format.space_after = Pt(10)
-        r = p.add_run("Легенда статусов:  ")
-        r.bold = True
-        r.font.size = Pt(9.5)
-        for txt, lvl in [(" в графике / решено / выполнено ", "ok"),
-                         (" риск / на контроле / ожидает решения ", "warn"),
-                         (" отставание / проблема, требует решения ", "bad"),
-                         (" пробел в исходных данных ", "note")]:
-            r2 = p.add_run(txt)
-            r2.font.size = Pt(9.5)
-            r2.bold = True
-            r2.font.color.rgb = RGBColor.from_string(STATUS_FONT[lvl])
 
     for section in spec.get("sections", []):
         _h1(doc, section["heading"])
@@ -227,7 +236,7 @@ def generate_detailed_report(spec, out_path):
 
     if spec.get("footer_note"):
         doc.add_page_break()
-        _para(doc, spec["footer_note"], size=9.5, italic=True, color="595959")
+        _para(doc, spec["footer_note"], size=9.5, italic=True, color=MUTED)
 
     doc.save(out_path)
     return out_path
@@ -243,7 +252,7 @@ def generate_short_report(spec, out_path):
 
     title = doc.add_heading(spec["title"], level=0)
     for run in title.runs:
-        run.font.color.rgb = RGBColor.from_string(HEADER_FILL)
+        run.font.color.rgb = RGBColor.from_string(INK)
         run.font.size = Pt(16)
 
     for line in spec.get("subtitle_lines", []):
@@ -256,7 +265,7 @@ def generate_short_report(spec, out_path):
         _render_table_block(doc, block)
 
     if spec.get("footer_note"):
-        _para(doc, spec["footer_note"], italic=True, size=9.5, color="595959")
+        _para(doc, spec["footer_note"], italic=True, size=9.5, color=MUTED)
 
     doc.save(out_path)
     return out_path

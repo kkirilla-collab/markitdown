@@ -12,13 +12,26 @@ Converts an ad-hoc status memo into two standing report forms:
    & supply, work closure (КС), advances & bank guarantees, a cross-cutting
    risk register, and a "suggestions to improve the form" section.
 2. **Short/dynamic form** — a one-page dashboard: top KPIs, a per-party status
-   table (RAG-coloured), a day-over-day "dynamics log" table meant to be
-   extended with one new row per day, and an open-correspondence aging tracker.
+   table, a day-over-day "dynamics log" table meant to be extended with one
+   new row per day, and an open-correspondence aging tracker.
 
 This structure was designed against a real construction-project справка (a
 generподряд with several subcontracts) but the renderer (`render.py`) is
 domain-agnostic — it only renders whatever section/table structure you hand
 it. Nothing about "contractors" or "construction" is hardcoded.
+
+## Style — classic monochrome, by explicit request
+
+The renderer is deliberately **black-and-white only**: black text, black-fill/
+white-text table headers, no colour-coded (RAG/traffic-light) status
+highlighting anywhere. This was an explicit user correction after a first
+version used green/amber/red status cells — they asked for a "classic
+corporate" (laconic, black-and-white) look instead, and that's now the
+permanent default, not a one-off preference. Status/verdict text (`status()`)
+is distinguished by being **bold**, never by colour or cell fill — the wording
+itself ("В графике" / "Отставание" / "Риск") carries the meaning. Don't
+reintroduce fills or hue-based colour when extending this skill; if a report
+seems to need visual differentiation, use bold/italic/wording, not colour.
 
 ## When to use
 
@@ -68,13 +81,16 @@ it. Nothing about "contractors" or "construction" is hardcoded.
 ## Helper functions (`render.py`)
 
 - `fmt(n)` — RU-style thousands/decimal formatting: `1234567.8` → `"1 234 567,80"`.
-- `status(text, level)` — coloured cell, `level` ∈ `"ok" | "warn" | "bad" | "note"`
-  (green / amber / red / grey). Use for schedule status, RAG indicators.
+- `status(text, level=None)` — bold black cell (no colour/fill) for a
+  status/verdict value. `level` ∈ `"ok" | "warn" | "bad" | "note"` is accepted
+  for the caller's own bookkeeping/consistency but doesn't affect rendering —
+  every status renders the same (bold); put the distinction in the wording.
 - `gap(text="не указано в справке")` — grey italic cell marking a genuine gap
   in the source data.
-- `blank(text="—")` — lighter grey italic cell for a future-date placeholder
-  row (e.g. tomorrow's row in a dynamics log) — distinct from `gap()`, which
-  means "the source should have had this and didn't."
+- `blank(text="—")` — grey italic cell for a future-date placeholder row
+  (e.g. tomorrow's row in a dynamics log) — same look as `gap()`, kept as a
+  separate function only so calling code can express *why* the cell is empty
+  ("source never had this" vs. "this is tomorrow, not written yet").
 
 ## Schema
 
@@ -85,8 +101,7 @@ it. Nothing about "contractors" or "construction" is hardcoded.
   "title": str,                      # top H0 heading
   "subtitle_lines": [str, ...],      # bold lines under the title (object/parties/contract)
   "meta_line": str,                  # "Дата отчёта: ...    Составил: ___"
-  "top_notes": [str, ...],           # ⚠ callouts right under the header (e.g. source data conflicts)
-  "legend": bool,                    # render the ok/warn/bad/note colour legend
+  "top_notes": [str, ...],           # grey-italic callouts right under the header (e.g. source data conflicts)
   "sections": [
     {
       "heading": str,                # e.g. "1. Наименование контрагента, виды работ"
@@ -96,7 +111,7 @@ it. Nothing about "contractors" or "construction" is hardcoded.
         "rows": [[cell, ...], ...],  # cell = str | status(...) | gap(...) | blank(...)
         "widths_cm": [float, ...],   # optional, else auto
       },
-      "notes": [str, ...],           # optional ⚠ callouts after the table
+      "notes": [str, ...],           # optional grey-italic callouts after the table
     },
     ...                              # one dict per report section — add as many as needed
   ],
