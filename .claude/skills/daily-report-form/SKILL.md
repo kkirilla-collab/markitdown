@@ -66,6 +66,12 @@ seems to need visual differentiation, use bold/italic/wording, not colour.
 4. **Verify before sending.** Convert the generated docx back with
    `python3 -m markitdown <out>.docx` and read it — this catches malformed
    tables/typos cheaply, the same way you'd verify any generated artifact.
+   Note this only checks *content*, not styling: Markdown has no concept of
+   cell shading or font colour, so a stray fill/colour survives this check
+   invisibly. If you're touching `render.py`'s styling (e.g. verifying the
+   black-and-white rule above still holds), grep the raw XML instead:
+   `python3 -c "import zipfile,re; print(set(re.findall(r'w:fill=\"([0-9A-Fa-f]{6})\"', zipfile.ZipFile('<out>.docx').read('word/document.xml').decode())))"`
+   — should only ever show `000000` (header fill).
 5. **Deliver.** Send both files to the user directly (e.g. via the
    host's file-delivery mechanism). **Do not commit filled-in reports that
    contain real business data into this repository** — the repo is shared
