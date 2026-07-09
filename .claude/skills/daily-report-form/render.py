@@ -18,6 +18,13 @@ is a deliberate choice (not a limitation): plain black-and-white also holds up
 when a report is printed or photocopied on a monochrome printer, unlike
 colour-coding, which silently degrades to indistinguishable grey.
 
+Font is Proxima Nova Extra Condensed at a 14pt base size (by explicit
+request) — set both on the Normal style AND on every individual run (see
+`_apply_font`), because Word doesn't reliably cascade a style's font name
+into table cells / heading styles. If the font isn't installed on whichever
+machine opens the file, Word substitutes a fallback for display, but the
+document still correctly specifies this font.
+
 Callers build the `spec` dicts (usually Claude, after reading a new source
 memo and extracting facts into this shape) and pass them to
 `generate_detailed_report` / `generate_short_report`. Cells in a table row can
@@ -31,6 +38,9 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.section import WD_ORIENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+
+FONT_NAME = "Proxima Nova Extra Condensed"
+BASE_SIZE = 14       # pt — the report's standard body/table size
 
 INK = "000000"       # all text — pure black, no theme colours
 HEADER_FILL = "000000"  # table header row background
@@ -69,6 +79,20 @@ def blank(text="—"):
 # low-level docx helpers
 # --------------------------------------------------------------------------
 
+def _apply_font(run, name=FONT_NAME):
+    """Force a font name onto a single run (ascii/hAnsi/eastAsia/cs slots) —
+    setting it only on the Normal style doesn't reliably reach table cells
+    or heading styles, so every run created below calls this explicitly."""
+    run.font.name = name
+    rPr = run._r.get_or_add_rPr()
+    rFonts = rPr.find(qn("w:rFonts"))
+    if rFonts is None:
+        rFonts = OxmlElement("w:rFonts")
+        rPr.append(rFonts)
+    for attr in ("w:ascii", "w:hAnsi", "w:eastAsia", "w:cs"):
+        rFonts.set(qn(attr), name)
+
+
 def _shade_cell(cell, color_hex):
     tcPr = cell._tc.get_or_add_tcPr()
     shd = OxmlElement("w:shd")
@@ -78,7 +102,7 @@ def _shade_cell(cell, color_hex):
     tcPr.append(shd)
 
 
-def _set_cell(cell, text, bold=False, italic=False, color=None, size=9.5, align=None):
+def _set_cell(cell, text, bold=False, italic=False, color=None, size=BASE_SIZE, align=None):
     cell.text = ""
     p = cell.paragraphs[0]
     if align:
@@ -88,6 +112,7 @@ def _set_cell(cell, text, bold=False, italic=False, color=None, size=9.5, align=
     run.italic = italic
     run.font.size = Pt(size)
     run.font.color.rgb = RGBColor.from_string(color or INK)
+    _apply_font(run)
     return run
 
 
@@ -107,7 +132,7 @@ def _add_table(doc, headers, rows, widths_cm=None):
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     hdr_cells = table.rows[0].cells
     for i, h in enumerate(headers):
-        _set_cell(hdr_cells[i], h, bold=True, color=HEADER_FONT, size=9.5)
+        _set_cell(hdr_cells[i], h, bold=True, color=HEADER_FONT)
         _shade_cell(hdr_cells[i], HEADER_FILL)
     for row in rows:
         cells = table.add_row().cells
@@ -116,9 +141,9 @@ def _add_table(doc, headers, rows, widths_cm=None):
                 text, opts = val
                 _set_cell(cells[i], text, bold=opts.get("bold", False),
                           italic=opts.get("italic", False), color=opts.get("color"),
-                          size=opts.get("size", 9.5))
+                          size=opts.get("size", BASE_SIZE))
             else:
-                _set_cell(cells[i], str(val), size=9.5)
+                _set_cell(cells[i], str(val))
     if widths_cm:
         table.autofit = False
         for row in table.rows:
@@ -144,10 +169,12 @@ def _h1(doc, text):
     p = doc.add_heading(text, level=1)
     for run in p.runs:
         run.font.color.rgb = RGBColor.from_string(INK)
+        run.font.size = Pt(16)
+        _apply_font(run)
     _add_bottom_border(p)
 
 
-def _para(doc, text, bold=False, italic=False, size=10.5, color=None, space_after=6):
+def _para(doc, text, bold=False, italic=False, size=BASE_SIZE, color=None, space_after=6):
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(space_after)
     run = p.add_run(text)
@@ -155,10 +182,11 @@ def _para(doc, text, bold=False, italic=False, size=10.5, color=None, space_afte
     run.italic = italic
     run.font.size = Pt(size)
     run.font.color.rgb = RGBColor.from_string(color or INK)
+    _apply_font(run)
 
 
 def _note(doc, text):
-    _para(doc, text, italic=True, size=9.5, color=MUTED)
+    _para(doc, text, italic=True, color=MUTED)
 
 
 def _bullet(doc, lead, text):
@@ -167,30 +195,33 @@ def _bullet(doc, lead, text):
     if lead:
         r = p.add_run(lead)
         r.bold = True
-        r.font.size = Pt(10.5)
+        r.font.size = Pt(BASE_SIZE)
         r.font.color.rgb = RGBColor.from_string(INK)
+        _apply_font(r)
     r2 = p.add_run(text)
-    r2.font.size = Pt(10.5)
+    r2.font.size = Pt(BASE_SIZE)
     r2.font.color.rgb = RGBColor.from_string(INK)
+    _apply_font(r2)
 
 
 def _set_base_style(doc):
     style = doc.styles["Normal"]
-    style.font.name = "Times New Roman"
-    style.font.size = Pt(11)
+    style.font.name = FONT_NAME
+    style.font.size = Pt(BASE_SIZE)
     style.font.color.rgb = RGBColor.from_string(INK)
     rpr = style.element.get_or_add_rPr()
     rFonts = rpr.find(qn("w:rFonts"))
     if rFonts is None:
         rFonts = OxmlElement("w:rFonts")
         rpr.append(rFonts)
-    rFonts.set(qn("w:eastAsia"), "Times New Roman")
+    for attr in ("w:ascii", "w:hAnsi", "w:eastAsia", "w:cs"):
+        rFonts.set(qn(attr), FONT_NAME)
 
 
 def _render_table_block(doc, block):
     if block.get("intro"):
         for line in block["intro"]:
-            _para(doc, line, size=10.5)
+            _para(doc, line)
     t = block["table"]
     _add_table(doc, t["headers"], t["rows"], t.get("widths_cm"))
     for line in block.get("notes", []):
@@ -213,14 +244,15 @@ def generate_detailed_report(spec, out_path):
     title = doc.add_heading(spec["title"], level=0)
     for run in title.runs:
         run.font.color.rgb = RGBColor.from_string(INK)
-        run.font.size = Pt(18)
+        run.font.size = Pt(20)
+        _apply_font(run)
 
     for line in spec.get("subtitle_lines", []):
-        _para(doc, line, bold=True, size=11)
+        _para(doc, line, bold=True)
     for line in spec.get("top_notes", []):
         _note(doc, line)
     if spec.get("meta_line"):
-        _para(doc, spec["meta_line"], size=10)
+        _para(doc, spec["meta_line"])
 
     for section in spec.get("sections", []):
         _h1(doc, section["heading"])
@@ -230,13 +262,13 @@ def generate_detailed_report(spec, out_path):
     if sug:
         _h1(doc, sug["heading"])
         if sug.get("intro"):
-            _para(doc, sug["intro"], size=10.5)
+            _para(doc, sug["intro"])
         for item in sug["items"]:
             _bullet(doc, item.get("lead", ""), item["text"])
 
     if spec.get("footer_note"):
         doc.add_page_break()
-        _para(doc, spec["footer_note"], size=9.5, italic=True, color=MUTED)
+        _para(doc, spec["footer_note"], italic=True, color=MUTED)
 
     doc.save(out_path)
     return out_path
@@ -253,19 +285,20 @@ def generate_short_report(spec, out_path):
     title = doc.add_heading(spec["title"], level=0)
     for run in title.runs:
         run.font.color.rgb = RGBColor.from_string(INK)
-        run.font.size = Pt(16)
+        run.font.size = Pt(18)
+        _apply_font(run)
 
     for line in spec.get("subtitle_lines", []):
-        _para(doc, line, size=10.5)
+        _para(doc, line)
     if spec.get("meta_line"):
-        _para(doc, spec["meta_line"], size=10)
+        _para(doc, spec["meta_line"])
 
     for block in spec.get("blocks", []):
         _h1(doc, block["heading"])
         _render_table_block(doc, block)
 
     if spec.get("footer_note"):
-        _para(doc, spec["footer_note"], italic=True, size=9.5, color=MUTED)
+        _para(doc, spec["footer_note"], italic=True, color=MUTED)
 
     doc.save(out_path)
     return out_path
