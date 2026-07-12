@@ -16,6 +16,8 @@ pip install --quiet -e "packages/markitdown[all]"
 # cffi provides the _cffi_backend used by cryptography (pulled in via pdfminer);
 # the base image ships a Debian cryptography without it, so install it explicitly.
 pip install --quiet pytest black cffi
+# python-docx renders the .claude/skills/daily-report-form output (not a markitdown dep).
+pip install --quiet python-docx
 
 # ffmpeg is the system binary that pydub needs for the audio-transcription tests;
 # install it if it isn't already present (best-effort, don't fail the hook on it).
